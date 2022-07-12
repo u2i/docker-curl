@@ -5,7 +5,6 @@
 # docker run --rm -v $(pwd):/tmp -w /tmp -e ARCH=aarch64 multiarch/alpine:aarch64-latest-stable /tmp/build.sh
 # docker run --rm -v $(pwd):/tmp -w /tmp -e ARCH=ARCH_HERE ALPINE_IMAGE_HERE /tmp/build.sh
 
-CURL_VERSION='7.83.1'
 
 [ "$1" != "" ] && CURL_VERSION="$1"
 
@@ -13,7 +12,6 @@ set -exu
 
 if [ ! -f curl-${CURL_VERSION}.tar.gz ]
 then
-
     # for gpg verification of the curl download below
     apk add gnupg
 
@@ -23,7 +21,6 @@ then
     gpg --no-default-keyring --yes -o ./curl.gpg --dearmor mykey.asc
     # this has a non-zero exit code if it fails, which will halt the script
     gpg --no-default-keyring --keyring ./curl.gpg --verify curl-${CURL_VERSION}.tar.gz.asc
-
 fi
 
 rm -rf "curl-${CURL_VERSION}/"
