@@ -20,3 +20,5 @@ FROM scratch
 
 USER 1000
 COPY --chmod=555 --chown=1000 --from=builder /curl /curl
+
+ENTRYPOINT ["/curl"]
