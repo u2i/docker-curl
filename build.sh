@@ -10,29 +10,12 @@
 
 set -exu
 
-if [ ! -f curl-${CURL_VERSION}.tar.gz ]
-then
-    # for gpg verification of the curl download below
-    apk add gnupg
+DIR=$(mktemp -d)
+echo "Building using temporary directory: ${DIR}"
 
-    wget https://curl.haxx.se/download/curl-${CURL_VERSION}.tar.gz https://curl.haxx.se/download/curl-${CURL_VERSION}.tar.gz.asc
+tar xzf "${FILE_NAME}" --strip-components 1 --directory="${DIR}"
 
-    # convert mykey.asc to a .pgp file to use in verification
-    gpg --no-default-keyring --yes -o ./curl.gpg --dearmor mykey.asc
-    # this has a non-zero exit code if it fails, which will halt the script
-    gpg --no-default-keyring --keyring ./curl.gpg --verify curl-${CURL_VERSION}.tar.gz.asc
-fi
-
-rm -rf "curl-${CURL_VERSION}/"
-tar xzf curl-${CURL_VERSION}.tar.gz
-
-cd curl-${CURL_VERSION}/
-
-# dependencies to build curl
-apk add build-base clang openssl-dev nghttp2-dev nghttp2-static libssh2-dev libssh2-static
-
-# these are missing on at least armhf
-apk add openssl-libs-static zlib-static || true
+cd "${DIR}"
 
 # gcc is apparantly incapable of building a static binary, even gcc -static helloworld.c ends up linked to libc, instead of solving, use clang
 export CC=clang
@@ -48,7 +31,7 @@ LDFLAGS="-static" PKG_CONFIG="pkg-config --static" ./configure --disable-shared 
 
 # LDFLAGS="-static" PKG_CONFIG="pkg-config --static" ./configure --disable-shared --enable-static --disable-ldap --enable-ipv6 --enable-unix-sockets --with-ssl --with-libssh2
 
-make -j4 V=1 LDFLAGS="-static -all-static"
+make -j V=1 LDFLAGS="-static -all-static"
 
 # binary is ~13M before stripping, 2.6M after
 strip src/curl
@@ -67,6 +50,7 @@ ldd src/curl && exit 1 || true
 mkdir -p /tmp/release/
 mv src/curl "/curl"
 cd ..
-rm -rf "curl-${CURL_VERSION}/"
+
+rm -rf "${DIR}"
 
 # curl static binary will be available at /curl without execute permissions
