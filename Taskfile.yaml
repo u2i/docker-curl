@@ -1,0 +1,105 @@
+# https://taskfile.dev
+
+version: '3'
+
+vars:
+  CURL_VERSION: '{{.CURL_VERSION | default "7.83.1"}}'
+  
+  PROJECT_NAME: curl
+  REGISTRY_SERVER: public.ecr.aws/u4i8g9e8
+  REGISTRY: '{{.REGISTRY_SERVER}}/{{.PROJECT_NAME}}'
+
+tasks:
+  default:
+    cmds:
+      - task: buildx
+    silent: true
+
+  buildx:
+    cmds:
+      - |-
+        docker buildx build \
+        --build-arg BUILDKIT_INLINE_CACHE=1 \
+        --build-arg CURL_VERSION={{.CURL_VERSION}} \
+        --platform linux/amd64,linux/arm64 \
+        --target builder \
+        -t {{.REGISTRY}}:builder-{{.CURL_VERSION}} \
+        -t {{.REGISTRY}}:builder-latest \
+        --cache-from={{.REGISTRY}}:builder-{{.CURL_VERSION}} \
+        --push \
+        .
+      
+      - |-
+        docker buildx build \
+        --build-arg BUILDKIT_INLINE_CACHE=1 \
+        --build-arg CURL_VERSION={{.CURL_VERSION}} \
+        --platform linux/amd64,linux/arm64 \
+        -t {{.REGISTRY}}:{{.CURL_VERSION}} \
+        -t {{.REGISTRY}}:latest \
+        --cache-from={{.REGISTRY}}:builder-{{.CURL_VERSION}} \
+        --push \
+        .
+
+
+  build:
+    deps:
+      - task: build:arch
+        vars: 
+          ARCH: amd64
+      - task: build:arch
+        vars: 
+          ARCH: arm64
+
+  build:arch:
+    cmds:
+      - |-
+        docker build \
+        --build-arg BUILDKIT_INLINE_CACHE=1 \
+        --build-arg CURL_VERSION={{.CURL_VERSION}} \
+        --platform linux/{{.ARCH}} \
+        --target builder \
+        -t {{.REGISTRY}}:builder-{{.CURL_VERSION}}-{{.ARCH}} \
+        .
+        
+      - |-
+        docker build \
+        --build-arg BUILDKIT_INLINE_CACHE=1 \
+        --build-arg CURL_VERSION={{.CURL_VERSION}} \
+        --platform linux/{{.ARCH}} \
+        -t {{.REGISTRY}}:{{.CURL_VERSION}}-{{.ARCH}} \
+        .
+    label: 'build:{{.ARCH}}'
+    run: when_changed
+
+  push:
+    deps:
+      - task: push:arch
+        vars:
+          ARCH: amd64
+      - task: push:arch
+        vars:
+          ARCH: arm64
+    run: when_changed
+
+  push:arch:
+    deps:
+      - task: build:arch
+        vars:
+          ARCH: '{{.ARCH}}'
+    cmds:
+      - docker push {{.REGISTRY}}:{{.CURL_VERSION}}-{{.ARCH}}
+    label: push:{{.ARCH}}
+      
+  manifest:
+    deps:
+      - task: push
+    cmds:
+      - docker manifest create {{.REGISTRY}}:latest --amend {{.REGISTRY}}:{{.CURL_VERSION}}-amd64 --amend {{.REGISTRY}}:{{.CURL_VERSION}}-arm64
+      - docker manifest create {{.REGISTRY}}:{{.CURL_VERSION}} --amend {{.REGISTRY}}:{{.CURL_VERSION}}-amd64 --amend {{.REGISTRY}}:{{.CURL_VERSION}}-arm64
+      - task: manifest:push
+
+  manifest:push:
+    cmds:
+      - docker manifest push {{.REGISTRY}}:latest
+      - docker manifest push {{.REGISTRY}}:{{.CURL_VERSION}}
+
