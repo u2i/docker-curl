@@ -1,34 +1,6 @@
 #!/bin/sh
 
-# to test locally, run one of:
-# docker run --rm -v $(pwd):/tmp -w /tmp -e ARCH=amd64 alpine /tmp/build.sh
-# docker run --rm -v $(pwd):/tmp -w /tmp -e ARCH=aarch64 multiarch/alpine:aarch64-latest-stable /tmp/build.sh
-# docker run --rm -v $(pwd):/tmp -w /tmp -e ARCH=ARCH_HERE ALPINE_IMAGE_HERE /tmp/build.sh
-
-
-[ "$1" != "" ] && CURL_VERSION="$1"
-
-set -exu
-
-DIR=$(mktemp -d)
-echo "Building using temporary directory: ${DIR}"
-
-tar xzf "${FILE_NAME}" --strip-components 1 --directory="${DIR}"
-
-cd "${DIR}"
-
-# gcc is apparantly incapable of building a static binary, even gcc -static helloworld.c ends up linked to libc, instead of solving, use clang
-export CC=clang
-
-# apply patches if needed
-#patch -p1 < ../static.patch
-#apk add autoconf automake libtool
-#autoreconf -fi
-# end apply patches
-
-# set up any required curl options here
-LDFLAGS="-static" PKG_CONFIG="pkg-config --static" ./configure --disable-shared --enable-static --disable-libcurl-option --without-brotli --disable-manual --disable-unix-sockets --disable-dict --disable-file --disable-gopher --disable-imap --disable-smtp --disable-rtsp --disable-telnet --disable-tftp --disable-pop3 --without-zlib --disable-threaded-resolver --disable-ipv6 --disable-smb --disable-ntlm-wb --disable-tls-srp --disable-crypto-auth --without-ngtcp2 --without-nghttp2 --disable-ftp --disable-mqtt --disable-alt-svc --without-ssl
-
+# docker buildx build --platform linux/amd64,linux/arm64 -t curl:slim .
 # LDFLAGS="-static" PKG_CONFIG="pkg-config --static" ./configure --disable-shared --enable-static --disable-ldap --enable-ipv6 --enable-unix-sockets --with-ssl --with-libssh2
 
 make -j V=1 LDFLAGS="-static -all-static"
@@ -44,13 +16,6 @@ ldd src/curl && exit 1 || true
 
 ./src/curl -V
 
-#./src/curl -v http://www.moparisthebest.com/; ./src/curl -v https://www.moparisthebest.com/ip
-
-# we only want to save curl here
-mkdir -p /tmp/release/
 mv src/curl "/curl"
-cd ..
-
-rm -rf "${DIR}"
 
 # curl static binary will be available at /curl without execute permissions
